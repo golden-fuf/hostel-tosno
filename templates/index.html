@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2d7d46">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <title>🏨 Хостел Тосно</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div id="app">
+        <header class="app-header">
+            <div class="header-content">
+                <h1 class="app-title">🏨 Хостел <span class="subtitle">Тосно</span></h1>
+                <div class="header-actions">
+                    <button class="btn-icon" onclick="showReport()" title="Отчёт">📊</button>
+                    <button class="btn-icon" onclick="showAddForm()" title="Заселить">➕</button>
+                    <button class="btn-icon" onclick="showSettings()" title="Настройки">⚙️</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="stats-bar" id="statsBar">
+            <div class="stat-item">
+                <span class="stat-label">Всего</span>
+                <span class="stat-value" id="totalCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">👥 Занято</span>
+                <span class="stat-value occupied" id="occupiedCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">🟢 Свободно</span>
+                <span class="stat-value free" id="freeCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Загрузка</span>
+                <span class="stat-value" id="loadPercent">0%</span>
+            </div>
+        </div>
+
+        <div class="search-section">
+            <div class="search-bar">
+                <input type="text" id="searchInput" placeholder="🔍 Поиск по имени, комнате, группе...">
+                <button class="btn-clear" onclick="clearSearch()">✕</button>
+            </div>
+            <div class="filter-tabs" id="filterTabs">
+                <button class="filter-tab active" data-group="all" onclick="filterByGroup('all')">Все</button>
+                <button class="filter-tab" data-group="occupied" onclick="filterByGroup('occupied')">👥 Занятые</button>
+                <button class="filter-tab" data-group="free" onclick="filterByGroup('free')">🟢 Свободные</button>
+            </div>
+        </div>
+
+        <div class="rooms-container" id="roomsContainer">
+            <div class="loading">Загрузка...</div>
+        </div>
+
+        <nav class="bottom-nav">
+            <button class="nav-item active" onclick="showMain()">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">Главная</span>
+            </button>
+            <button class="nav-item" onclick="showAddForm()">
+                <span class="nav-icon">➕</span>
+                <span class="nav-label">Заселить</span>
+            </button>
+            <button class="nav-item" onclick="showReport()">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Отчёт</span>
+            </button>
+            <button class="nav-item" onclick="showSettings()">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-label">Настройки</span>
+            </button>
+        </nav>
+    </div>
+
+    <div id="modalOverlay" class="modal-overlay" onclick="closeModal(event)">
+        <div class="modal" id="modalContent" onclick="event.stopPropagation()"></div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(() => console.log('✅ Service Worker зарегистрирован'))
+                .catch(err => console.log('❌ SW ошибка:', err));
+        }
+    </script>
+</body>
+</html>
