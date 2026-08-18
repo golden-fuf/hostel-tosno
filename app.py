@@ -1,5 +1,6 @@
 import os
 import re
+import requests
 from datetime import datetime
 from typing import Optional
 from functools import wraps
@@ -7,7 +8,6 @@ from pydantic import BaseModel, field_validator, ValidationError
 from flask import Flask, request, jsonify, send_from_directory, render_template_string
 from flask_cors import CORS
 from dotenv import load_dotenv
-from supabase import create_client, Client
 
 load_dotenv()
 
@@ -17,7 +17,18 @@ CORS(app, resources={r"/api/*": {"origins": os.getenv("CORS_ORIGINS", "*").split
 # ==================== ПОДКЛЮЧЕНИЕ К SUPABASE ====================
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-from supabase import create_client, Client(SUPABASE_URL, SUPABASE_KEY)
+
+def supabase_request(method, endpoint, data=None):
+    """Универсальная функция для запросов к Supabase"""
+    url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
+    response = requests.request(method, url, headers=headers, json=data)
+    return response
 
 # ==================== АУТЕНТИФИКАЦИЯ ====================
 AUTH_TOKEN = os.getenv("AUTH_TOKEN", "hostel-secret-2026")
@@ -122,20 +133,24 @@ def serve_icons(filename):
 @require_auth
 def get_residents():
     floor = request.args.get('floor', type=int)
-    query = supabase.table('residents').select('*')
+    params = {"select": "*"}
     if floor is not None:
-        query = query.eq('floor', floor)
-    query = query.order('room', desc=False).order('place', desc=False)
-    response = query.execute()
-    return jsonify(response.data)
+        params["floor"] = f"eq.{floor}"
+    params["order"] = "room.asc,place.asc"
+    
+    response = supabase_request("GET", "residents", params)
+    if response.status_code != 200:
+        return jsonify({"error": "Ошибка загрузки"}), 500
+    return jsonify(response.json())
 
 @app.route('/api/residents/<int:resident_id>', methods=['GET'])
 @require_auth
 def get_resident(resident_id):
-    response = supabase.table('residents').select('*').eq('id', resident_id).execute()
-    if response.data:
-        return jsonify(response.data[0])
-    return jsonify({'error': 'Not found'}), 404
+    params = {"select": "*", "id": f"eq.{resident_id}"}
+    response = supabase_request("GET", "residents", params)
+    if response.status_code != 200 or not response.json():
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(response.json()[0])
 
 @app.route('/api/residents/<int:resident_id>', methods=['PUT'])
 @require_auth
@@ -145,21 +160,27 @@ def update_resident(resident_id):
     except ValidationError as e:
         return jsonify({'error': e.errors()}), 400
 
+    # Проверка на дубликаты
     if data.full_name != '(свободно)':
-        check = supabase.table('residents').select('id').eq('full_name', data.full_name).neq('id', resident_id).execute()
-        if check.data:
+        params = {"select": "id", "full_name": f"eq.{data.full_name}", "id": f"neq.{resident_id}"}
+        check = supabase_request("GET", "residents", params)
+        if check.json():
             return jsonify({'error': 'Жилец с таким ФИО уже существует'}), 400
 
-    response = supabase.table('residents').update({
-        'group_name': data.group_name,
-        'full_name': data.full_name,
-        'check_in': data.check_in,
-        'registration': data.registration,
-        'phone': data.phone,
-        'note': data.note,
-        'updated_at': datetime.now().isoformat()
-    }).eq('id', resident_id).execute()
+    update_data = {
+        "group_name": data.group_name,
+        "full_name": data.full_name,
+        "check_in": data.check_in,
+        "registration": data.registration,
+        "phone": data.phone,
+        "note": data.note,
+        "updated_at": datetime.now().isoformat()
+    }
     
+    params = {"id": f"eq.{resident_id}"}
+    response = supabase_request("PATCH", f"residents", update_data, params)
+    if response.status_code not in [200, 204]:
+        return jsonify({"error": "Ошибка обновления"}), 500
     return jsonify({'status': 'success'})
 
 @app.route('/api/residents', methods=['POST'])
@@ -170,28 +191,34 @@ def add_resident():
     except ValidationError as e:
         return jsonify({'error': e.errors()}), 400
 
-    # Проверка существования места
-    existing = supabase.table('residents').select('*').eq('room', data.room).eq('place', data.place).execute()
-    if not existing.data:
+    # Проверка места
+    params = {"select": "*", "room": f"eq.{data.room}", "place": f"eq.{data.place}"}
+    existing = supabase_request("GET", "residents", params)
+    if not existing.json():
         return jsonify({'error': 'Место не найдено'}), 404
-    if existing.data[0]['full_name'] != '(свободно)':
+    if existing.json()[0]['full_name'] != '(свободно)':
         return jsonify({'error': 'Место занято'}), 400
 
     if data.full_name != '(свободно)':
-        check = supabase.table('residents').select('id').eq('full_name', data.full_name).execute()
-        if check.data:
+        params = {"select": "id", "full_name": f"eq.{data.full_name}"}
+        check = supabase_request("GET", "residents", params)
+        if check.json():
             return jsonify({'error': 'Жилец с таким ФИО уже заселён'}), 400
 
-    response = supabase.table('residents').update({
-        'group_name': data.group_name,
-        'full_name': data.full_name,
-        'check_in': data.check_in,
-        'registration': data.registration,
-        'phone': data.phone,
-        'note': data.note,
-        'updated_at': datetime.now().isoformat()
-    }).eq('room', data.room).eq('place', data.place).execute()
+    update_data = {
+        "group_name": data.group_name,
+        "full_name": data.full_name,
+        "check_in": data.check_in,
+        "registration": data.registration,
+        "phone": data.phone,
+        "note": data.note,
+        "updated_at": datetime.now().isoformat()
+    }
     
+    params = {"room": f"eq.{data.room}", "place": f"eq.{data.place}"}
+    response = supabase_request("PATCH", "residents", update_data, params)
+    if response.status_code not in [200, 204]:
+        return jsonify({"error": "Ошибка заселения"}), 500
     return jsonify({'status': 'success'}), 201
 
 @app.route('/api/residents/<int:resident_id>/move', methods=['POST'])
@@ -203,32 +230,37 @@ def move_resident(resident_id):
         return jsonify({'error': e.errors()}), 400
 
     if data.full_name != '(свободно)':
-        check = supabase.table('residents').select('id').eq('full_name', data.full_name).neq('id', resident_id).execute()
-        if check.data:
+        params = {"select": "id", "full_name": f"eq.{data.full_name}", "id": f"neq.{resident_id}"}
+        check = supabase_request("GET", "residents", params)
+        if check.json():
             return jsonify({'error': 'Жилец с таким ФИО уже существует'}), 400
 
     # Освобождаем старое место
-    supabase.table('residents').update({
-        'group_name': '-',
-        'full_name': '(свободно)',
-        'check_in': None,
-        'registration': None,
-        'phone': '-',
-        'note': '-'
-    }).eq('id', resident_id).execute()
+    params = {"id": f"eq.{resident_id}"}
+    supabase_request("PATCH", "residents", {
+        "group_name": "-",
+        "full_name": "(свободно)",
+        "check_in": None,
+        "registration": None,
+        "phone": "-",
+        "note": "-"
+    }, params)
 
     # Проверяем новое место
-    target = supabase.table('residents').select('*').eq('room', data.to_room).eq('place', data.to_place).execute()
-    if target.data and target.data[0]['full_name'] == '(свободно)':
-        supabase.table('residents').update({
-            'group_name': data.group_name,
-            'full_name': data.full_name,
-            'check_in': data.check_in,
-            'registration': data.registration,
-            'phone': data.phone,
-            'note': data.note,
-            'updated_at': datetime.now().isoformat()
-        }).eq('room', data.to_room).eq('place', data.to_place).execute()
+    params = {"select": "*", "room": f"eq.{data.to_room}", "place": f"eq.{data.to_place}"}
+    target = supabase_request("GET", "residents", params)
+    if target.json() and target.json()[0]['full_name'] == '(свободно)':
+        update_data = {
+            "group_name": data.group_name,
+            "full_name": data.full_name,
+            "check_in": data.check_in,
+            "registration": data.registration,
+            "phone": data.phone,
+            "note": data.note,
+            "updated_at": datetime.now().isoformat()
+        }
+        params = {"room": f"eq.{data.to_room}", "place": f"eq.{data.to_place}"}
+        supabase_request("PATCH", "residents", update_data, params)
         return jsonify({'status': 'success'})
     else:
         return jsonify({'error': 'Целевое место занято или не существует'}), 400
@@ -236,14 +268,15 @@ def move_resident(resident_id):
 @app.route('/api/residents/<int:resident_id>', methods=['DELETE'])
 @require_auth
 def free_place(resident_id):
-    supabase.table('residents').update({
-        'group_name': '-',
-        'full_name': '(свободно)',
-        'check_in': None,
-        'registration': None,
-        'phone': '-',
-        'note': '-'
-    }).eq('id', resident_id).execute()
+    params = {"id": f"eq.{resident_id}"}
+    supabase_request("PATCH", "residents", {
+        "group_name": "-",
+        "full_name": "(свободно)",
+        "check_in": None,
+        "registration": None,
+        "phone": "-",
+        "note": "-"
+    }, params)
     return jsonify({'status': 'success'})
 
 # ----- Настройки -----
@@ -256,21 +289,25 @@ def update_settings():
         return jsonify({'error': e.errors()}), 400
 
     for k, v in data.model_dump().items():
-        supabase.table('settings').upsert({'key': k, 'value': v}).execute()
+        supabase_request("POST", "settings", {"key": k, "value": v})
     return jsonify({'status': 'success'})
 
 @app.route('/api/settings', methods=['GET'])
 @require_auth
 def get_settings():
-    response = supabase.table('settings').select('key, value').execute()
-    settings = {item['key']: item['value'] for item in response.data}
+    params = {"select": "key,value"}
+    response = supabase_request("GET", "settings", params)
+    settings = {item['key']: item['value'] for item in response.json()}
     return jsonify(settings)
 
 # ----- Отчёты -----
 @app.route('/api/report', methods=['GET'])
 @require_auth
 def get_report():
-    residents = supabase.table('residents').select('*').execute().data
+    params = {"select": "*"}
+    response = supabase_request("GET", "residents", params)
+    residents = response.json()
+    
     total = len(residents)
     occupied = len([r for r in residents if r['full_name'] != '(свободно)'])
     free = total - occupied
@@ -283,8 +320,9 @@ def get_report():
     groups = [{'group_name': k, 'count': v} for k, v in groups_data.items()]
     groups.sort(key=lambda x: x['count'], reverse=True)
 
-    settings_resp = supabase.table('settings').select('key, value').execute()
-    settings = {item['key']: item['value'] for item in settings_resp.data}
+    params = {"select": "key,value"}
+    settings_resp = supabase_request("GET", "settings", params)
+    settings = {item['key']: item['value'] for item in settings_resp.json()}
 
     return jsonify({
         'total': total,
@@ -299,8 +337,9 @@ def get_report():
 @app.route('/api/groups', methods=['GET'])
 @require_auth
 def get_groups():
-    residents = supabase.table('residents').select('group_name').neq('group_name', '-').execute().data
-    groups = list(set(r['group_name'] for r in residents))
+    params = {"select": "group_name", "group_name": "neq.-"}
+    response = supabase_request("GET", "residents", params)
+    groups = list(set(r['group_name'] for r in response.json()))
     groups.sort()
     return jsonify(groups)
 
@@ -308,26 +347,28 @@ def get_groups():
 @require_auth
 def get_free_places():
     floor = request.args.get('floor', type=int)
-    query = supabase.table('residents').select('room, place, floor').eq('full_name', '(свободно)')
+    params = {"select": "room,place,floor", "full_name": "eq.(свободно)"}
     if floor is not None:
-        query = query.eq('floor', floor)
-    query = query.order('room', desc=False).order('place', desc=False)
-    response = query.execute()
-    return jsonify(response.data)
+        params["floor"] = f"eq.{floor}"
+    params["order"] = "room.asc,place.asc"
+    response = supabase_request("GET", "residents", params)
+    return jsonify(response.json())
 
 @app.route('/api/rooms', methods=['GET'])
 @require_auth
 def get_rooms():
-    response = supabase.table('residents').select('room').execute()
-    rooms = list(set(r['room'] for r in response.data))
+    params = {"select": "room"}
+    response = supabase_request("GET", "residents", params)
+    rooms = list(set(r['room'] for r in response.json()))
     rooms.sort(key=lambda x: int(x) if x.isdigit() else 0)
     return jsonify(rooms)
 
 @app.route('/api/floors', methods=['GET'])
 @require_auth
 def get_floors():
-    response = supabase.table('residents').select('floor').execute()
-    floors = list(set(r['floor'] for r in response.data))
+    params = {"select": "floor"}
+    response = supabase_request("GET", "residents", params)
+    floors = list(set(r['floor'] for r in response.json()))
     floors.sort()
     return jsonify(floors)
 
@@ -338,12 +379,14 @@ def export_html():
     if token != AUTH_TOKEN:
         return jsonify({"error": "Unauthorized"}), 401
     
-    residents = supabase.table('residents').select('*').order('floor', desc=False).order('room', desc=False).execute().data
+    params = {"select": "*", "order": "floor.asc,room.asc,place.asc"}
+    residents = supabase_request("GET", "residents", params).json()
     total = len(residents)
     occupied = len([r for r in residents if r['full_name'] != '(свободно)'])
     
-    settings_resp = supabase.table('settings').select('key, value').execute()
-    settings = {item['key']: item['value'] for item in settings_resp.data}
+    params = {"select": "key,value"}
+    settings_resp = supabase_request("GET", "settings", params)
+    settings = {item['key']: item['value'] for item in settings_resp.json()}
 
     html_template = '''
     <!DOCTYPE html>
@@ -433,7 +476,8 @@ def export_txt():
     if token != AUTH_TOKEN:
         return jsonify({"error": "Unauthorized"}), 401
     
-    residents = supabase.table('residents').select('*').order('floor', desc=False).order('room', desc=False).execute().data
+    params = {"select": "*", "order": "floor.asc,room.asc,place.asc"}
+    residents = supabase_request("GET", "residents", params).json()
 
     lines = ["Этаж\tКомната\tГруппа\t№\tФИО\tДата заезда\tРегистрация\tТелефон\tПримечание"]
     for r in residents:
