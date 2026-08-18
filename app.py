@@ -18,6 +18,12 @@ CORS(app, resources={r"/api/*": {"origins": os.getenv("CORS_ORIGINS", "*").split
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
+# ==================== ЛОГИРОВАНИЕ ====================
+def log(msg):
+    """Простое логирование в stdout (видно в логах Vercel)"""
+    print(f"[LOG] {msg}")
+
+# ==================== ЗАПРОСЫ К SUPABASE ====================
 def supabase_request(method, endpoint, data=None, params=None):
     """Универсальная функция для запросов к Supabase"""
     url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
@@ -28,13 +34,20 @@ def supabase_request(method, endpoint, data=None, params=None):
         "Prefer": "return=representation"
     }
     
-    # Преобразуем params в query string для GET
-    if method.upper() == "GET" and params:
-        # Для GET параметры передаются как query string
+    log(f"🔹 {method} {endpoint}")
+    if data:
+        log(f"   Data: {data}")
+    if params:
+        log(f"   Params: {params}")
+    
+    if method.upper() == "GET":
         response = requests.get(url, headers=headers, params=params)
     else:
-        # Для POST/PATCH/PUT данные передаются в теле
         response = requests.request(method, url, headers=headers, json=data, params=params)
+    
+    log(f"   Status: {response.status_code}")
+    if response.status_code >= 400:
+        log(f"   Error: {response.text[:200]}")
     
     return response
 
@@ -115,7 +128,7 @@ class SettingsUpdate(BaseModel):
     кпб_сдано: str
     кпб_принято: str
 
-# ==================== API ЭНДПОИНТЫ ====================
+# ==================== СТАТИЧЕСКИЕ ФАЙЛЫ ====================
 @app.route('/')
 def index():
     return send_from_directory('templates', 'index.html')
@@ -136,7 +149,7 @@ def manifest():
 def serve_icons(filename):
     return send_from_directory('static/icons', filename)
 
-# ----- Жильцы -----
+# ==================== API: ЖИЛЬЦЫ ====================
 @app.route('/api/residents', methods=['GET'])
 @require_auth
 def get_residents():
@@ -168,7 +181,6 @@ def update_resident(resident_id):
     except ValidationError as e:
         return jsonify({'error': e.errors()}), 400
 
-    # Проверка на дубликаты
     if data.full_name != '(свободно)':
         params = {"select": "id", "full_name": f"eq.{data.full_name}", "id": f"neq.{resident_id}"}
         check = supabase_request("GET", "residents", params=params)
@@ -187,8 +199,9 @@ def update_resident(resident_id):
     
     params = {"id": f"eq.{resident_id}"}
     response = supabase_request("PATCH", "residents", data=update_data, params=params)
-    if response.status_code not in [200, 204]:
-        return jsonify({"error": "Ошибка обновления"}), 500
+    
+    if response.status_code not in [200, 201, 204]:
+        return jsonify({"error": f"Ошибка обновления: {response.status_code}"}), 500
     return jsonify({'status': 'success'})
 
 @app.route('/api/residents', methods=['POST'])
@@ -199,7 +212,6 @@ def add_resident():
     except ValidationError as e:
         return jsonify({'error': e.errors()}), 400
 
-    # Проверка места
     params = {"select": "*", "room": f"eq.{data.room}", "place": f"eq.{data.place}"}
     existing = supabase_request("GET", "residents", params=params)
     if not existing.json():
@@ -225,8 +237,8 @@ def add_resident():
     
     params = {"room": f"eq.{data.room}", "place": f"eq.{data.place}"}
     response = supabase_request("PATCH", "residents", data=update_data, params=params)
-    if response.status_code not in [200, 204]:
-        return jsonify({"error": "Ошибка заселения"}), 500
+    if response.status_code not in [200, 201, 204]:
+        return jsonify({"error": f"Ошибка заселения: {response.status_code}"}), 500
     return jsonify({'status': 'success'}), 201
 
 @app.route('/api/residents/<int:resident_id>/move', methods=['POST'])
@@ -243,7 +255,6 @@ def move_resident(resident_id):
         if check.json():
             return jsonify({'error': 'Жилец с таким ФИО уже существует'}), 400
 
-    # Освобождаем старое место
     params = {"id": f"eq.{resident_id}"}
     supabase_request("PATCH", "residents", data={
         "group_name": "-",
@@ -254,7 +265,6 @@ def move_resident(resident_id):
         "note": "-"
     }, params=params)
 
-    # Проверяем новое место
     params = {"select": "*", "room": f"eq.{data.to_room}", "place": f"eq.{data.to_place}"}
     target = supabase_request("GET", "residents", params=params)
     if target.json() and target.json()[0]['full_name'] == '(свободно)':
@@ -287,28 +297,45 @@ def free_place(resident_id):
     }, params=params)
     return jsonify({'status': 'success'})
 
-# ----- Настройки -----
+# ==================== API: НАСТРОЙКИ ====================
 @app.route('/api/settings', methods=['POST'])
 @require_auth
 def update_settings():
+    """Сохранение настроек"""
     try:
         data = SettingsUpdate(**request.json)
+        log(f"Получены настройки: {data.model_dump()}")
     except ValidationError as e:
+        log(f"Ошибка валидации: {e.errors()}")
         return jsonify({'error': e.errors()}), 400
 
+    # Сохраняем каждую настройку через upsert
     for k, v in data.model_dump().items():
-        supabase_request("POST", "settings", data={"key": k, "value": v})
+        log(f"Сохраняем {k} = {v}")
+        # Используем POST с параметром on_conflict для upsert
+        params = {"on_conflict": "key"}
+        response = supabase_request("POST", "settings", data={"key": k, "value": v}, params=params)
+        if response.status_code not in [200, 201, 204]:
+            log(f"Ошибка сохранения {k}: {response.status_code}")
+            return jsonify({"error": f"Ошибка сохранения {k}"}), 500
+    
     return jsonify({'status': 'success'})
 
 @app.route('/api/settings', methods=['GET'])
 @require_auth
 def get_settings():
+    """Загрузка настроек"""
     params = {"select": "key,value"}
     response = supabase_request("GET", "settings", params=params)
+    if response.status_code != 200:
+        log(f"Ошибка загрузки настроек: {response.status_code}")
+        return jsonify({"error": "Ошибка загрузки настроек"}), 500
+    
     settings = {item['key']: item['value'] for item in response.json()}
+    log(f"Загружены настройки: {settings}")
     return jsonify(settings)
 
-# ----- Отчёты -----
+# ==================== API: ОТЧЁТЫ ====================
 @app.route('/api/report', methods=['GET'])
 @require_auth
 def get_report():
@@ -342,6 +369,7 @@ def get_report():
         'date': datetime.now().strftime('%Y-%m-%d')
     })
 
+# ==================== API: ВСПОМОГАТЕЛЬНЫЕ ====================
 @app.route('/api/groups', methods=['GET'])
 @require_auth
 def get_groups():
@@ -498,5 +526,6 @@ def export_txt():
     )
     return response
 
+# ==================== ЗАПУСК ====================
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
