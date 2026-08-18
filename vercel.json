@@ -10,8 +10,5 @@
       "src": "/(.*)",
       "dest": "app.py"
     }
-  ],
-  "env": {
-    "AUTH_TOKEN": "hostel-secret-2026"
-  }
+  ]
 }
