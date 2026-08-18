@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2d7d46">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Хостел Тосно</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div id="authOverlay" class="auth-overlay">
+        <div class="auth-box">
+            <h2>🔐 Вход в систему</h2>
+            <p>Введите токен доступа</p>
+            <input type="password" id="authToken" placeholder="Токен..." autocomplete="off">
+            <button onclick="doAuth()">Войти</button>
+            <div id="authError" class="auth-error"></div>
+        </div>
+    </div>
+
+    <div id="app" style="display:none;">
+        <header class="app-header">
+            <div class="header-content">
+                <h1 class="app-title">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    Хостел <span class="subtitle">Тосно</span>
+                </h1>
+                <div class="header-actions">
+                    <!-- НОВАЯ КНОПКА 1: Экспорт HTML (печать/PDF) -->
+                    <button class="btn-icon" onclick="window.open('/api/export/html?token=' + localStorage.getItem('hostel_auth_token'), '_blank')" title="Отчёт для печати">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M6 9V2h12v7"></path>
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                            <rect x="6" y="14" width="12" height="8"></rect>
+                        </svg>
+                    </button>
+                    
+                    <!-- НОВАЯ КНОПКА 2: Экспорт TXT (бэкап) -->
+                    <button class="btn-icon" onclick="window.location.href='/api/export/txt?token=' + localStorage.getItem('hostel_auth_token')" title="Скачать TXT (бэкап)">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                    </button>
+                    
+                    <!-- Старая кнопка Отчёт (статистика в модалке) -->
+                    <button class="btn-icon" onclick="showReport()" title="Статистика">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 12v-2a5 5 0 0 0-5-5H8a5 5 0 0 0-5 5v2"></path>
+                            <circle cx="12" cy="16" r="5"></circle>
+                            <line x1="12" y1="11" x2="12" y2="16"></line>
+                            <line x1="9" y1="13" x2="12" y2="16"></line>
+                            <line x1="15" y1="13" x2="12" y2="16"></line>
+                        </svg>
+                    </button>
+                    
+                    <!-- Старая кнопка Заселить -->
+                    <button class="btn-icon" onclick="showAddForm()" title="Заселить">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                    </button>
+                    
+                    <!-- Старая кнопка Настройки -->
+                    <button class="btn-icon" onclick="showSettings()" title="Настройки">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </button>
+                    
+                    <!-- Старая кнопка Выход (поставил в конец, как было) -->
+                    <button class="btn-icon" onclick="logout()" title="Выйти">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="stats-bar" id="statsBar">
+            <div class="stat-item"><span class="stat-label">Всего</span><span class="stat-value" id="totalCount">0</span></div>
+            <div class="stat-item"><span class="stat-label">Занято</span><span class="stat-value occupied" id="occupiedCount">0</span></div>
+            <div class="stat-item"><span class="stat-label">Свободно</span><span class="stat-value free" id="freeCount">0</span></div>
+            <div class="stat-item"><span class="stat-label">Загрузка</span><span class="stat-value" id="loadPercent">0%</span></div>
+        </div>
+
+        <div class="search-section">
+            <div class="search-bar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="searchInput" placeholder="Поиск по имени, комнате, группе..." style="padding-left:44px;">
+                <button class="btn-clear" onclick="clearSearch()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="floor-filter" id="floorFilter">
+                <span class="floor-label">Этаж:</span>
+                <div class="floor-tabs" id="floorTabs"></div>
+            </div>
+            <div class="filter-tabs" id="filterTabs">
+                <button class="filter-tab active" data-group="all" onclick="filterByGroup('all')">Все</button>
+                <button class="filter-tab" data-group="occupied" onclick="filterByGroup('occupied')">Занятые</button>
+                <button class="filter-tab" data-group="free" onclick="filterByGroup('free')">Свободные</button>
+            </div>
+        </div>
+
+        <div class="rooms-container" id="roomsContainer">
+            <div class="loading">Загрузка...</div>
+        </div>
+    </div>
+
+    <div id="modalOverlay" class="modal-overlay" onclick="closeModal(event)">
+        <div class="modal" id="modalContent" onclick="event.stopPropagation()"></div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
