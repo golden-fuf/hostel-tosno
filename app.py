@@ -1,7 +1,6 @@
 import os
 import re
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import sqlite3
 from datetime import datetime
 from typing import Optional
 from functools import wraps
@@ -15,14 +14,6 @@ load_dotenv()
 app = Flask(__name__, template_folder='templates', static_folder='static')
 CORS(app, resources={r"/api/*": {"origins": os.getenv("CORS_ORIGINS", "*").split(",")}})
 
-# ==================== ПОДКЛЮЧЕНИЕ К БАЗЕ ====================
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-def get_db():
-    """Подключение к Postgres"""
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-    return conn
-
 # ==================== АУТЕНТИФИКАЦИЯ ====================
 AUTH_TOKEN = os.getenv("AUTH_TOKEN", "hostel-secret-2026")
 
@@ -35,16 +26,22 @@ def require_auth(f):
         return f(*args, **kwargs)
     return decorated
 
-# ==================== ИНИЦИАЛИЗАЦИЯ БАЗЫ ====================
+# ==================== БАЗА ДАННЫХ ====================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'data', 'hostel.db')
+TXT_FILE_MAIN = os.path.join(BASE_DIR, 'новый 1.txt')
+
+def get_db():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
 def init_db():
-    """Создание таблиц и начальных данных"""
     conn = get_db()
-    cur = conn.cursor()
-    
-    # Таблица residents
-    cur.execute('''
+    conn.executescript('''
         CREATE TABLE IF NOT EXISTS residents (
-            id SERIAL PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             floor INTEGER NOT NULL,
             room TEXT NOT NULL,
             group_name TEXT DEFAULT '-',
@@ -54,92 +51,97 @@ def init_db():
             registration TEXT DEFAULT NULL,
             phone TEXT DEFAULT '-',
             note TEXT DEFAULT '-',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(room, place)
-        )
-    ''')
-    
-    # Таблица settings
-    cur.execute('''
+        );
+        CREATE INDEX IF NOT EXISTS idx_residents_room ON residents(room);
+        CREATE INDEX IF NOT EXISTS idx_residents_name ON residents(full_name);
+        CREATE INDEX IF NOT EXISTS idx_residents_group ON residents(group_name);
+
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT
-        )
-    ''')
-    
-    # Таблица history
-    cur.execute('''
+        );
+
         CREATE TABLE IF NOT EXISTS history (
-            id SERIAL PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             resident_id INTEGER,
             action TEXT,
             old_data TEXT,
             new_data TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
     ''')
-    
-    # Настройки по умолчанию
+
     default_settings = {
         'стирка': '400', 'госпошлина': '2000',
         'кпб_чистое': '10', 'кпб_грязное': '4',
         'кпб_сдано': '0', 'кпб_принято': '0'
     }
     for k, v in default_settings.items():
-        cur.execute(
-            'INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING',
-            (k, v)
-        )
-    
-    # Импорт из TXT, если таблица пуста
-    cur.execute('SELECT COUNT(*) as cnt FROM residents')
-    count = cur.fetchone()['cnt']
-    
-    if count == 0:
-        TXT_FILE_MAIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'новый 1.txt')
-        if os.path.exists(TXT_FILE_MAIN):
-            import_data(conn)
-    
+        conn.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', (k, v))
+
+    if conn.execute('SELECT COUNT(*) as cnt FROM residents').fetchone()['cnt'] == 0:
+        imported = import_data(conn)
+        if not imported:
+            print("Файлы не найдены или пусты, создаю тестовые данные...")
+            create_test_data(conn)
+
     conn.commit()
-    cur.close()
     conn.close()
 
 def import_data(conn):
-    """Импорт данных из TXT файла"""
-    TXT_FILE_MAIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'новый 1.txt')
     if not os.path.exists(TXT_FILE_MAIN):
+        print(f"❌ Файл не найден: {TXT_FILE_MAIN}")
         return False
-    
-    cur = conn.cursor()
-    with open(TXT_FILE_MAIN, 'r', encoding='utf-8') as f:
-        lines = f.read().strip().split('\n')
-        for line in lines[1:]:
-            parts = line.split('\t')
-            if len(parts) >= 5:
-                check_in = parts[5] if len(parts) > 5 and parts[5] != '-' else None
-                registration = parts[6] if len(parts) > 6 and parts[6] != '-' else None
-                phone = parts[7] if len(parts) > 7 and parts[7] != '-' else '-'
-                note = parts[8] if len(parts) > 8 and parts[8] != '-' else '-'
-                
-                cur.execute('''
-                    INSERT INTO residents 
-                    (floor, room, group_name, place, full_name, check_in, registration, phone, note)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (room, place) DO UPDATE SET
-                        floor = EXCLUDED.floor,
-                        group_name = EXCLUDED.group_name,
-                        full_name = EXCLUDED.full_name,
-                        check_in = EXCLUDED.check_in,
-                        registration = EXCLUDED.registration,
-                        phone = EXCLUDED.phone,
-                        note = EXCLUDED.note
-                ''', (
-                    int(parts[0]), parts[1], parts[2], int(parts[3]), parts[4],
-                    check_in, registration, phone, note
-                ))
+
+    print(f"✅ Найден файл: {TXT_FILE_MAIN}, начинаю импорт...")
+    try:
+        with open(TXT_FILE_MAIN, 'r', encoding='utf-8') as f:
+            lines = f.read().strip().split('\n')
+            for line in lines[1:]:
+                parts = line.split('\t')
+                if len(parts) >= 5:
+                    check_in = parts[5] if len(parts) > 5 and parts[5] != '-' else None
+                    registration = parts[6] if len(parts) > 6 and parts[6] != '-' else None
+
+                    if check_in:
+                        try:
+                            check_in = datetime.strptime(check_in, '%d.%m.%Y').date().isoformat()
+                        except:
+                            check_in = None
+                    if registration:
+                        try:
+                            registration = datetime.strptime(registration, '%d.%m.%Y').date().isoformat()
+                        except:
+                            registration = None
+
+                    conn.execute('''
+                        INSERT OR REPLACE INTO residents 
+                        (floor, room, group_name, place, full_name, check_in, registration, phone, note)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (int(parts[0]), parts[1], parts[2], int(parts[3]), parts[4],
+                          check_in, registration, parts[7] if len(parts) > 7 else '-',
+                          parts[8] if len(parts) > 8 else '-'))
+        print("✅ Импорт завершён.")
+        return True
+    except Exception as e:
+        print(f"❌ ОШИБКА импорта: {e}")
+        return False
+
+def create_test_data(conn):
+    test_data = [
+        (1, '1', 'Индусы', 1, 'Мохд Джамин', None, None, '-', '-'),
+        (1, '1', 'Индусы', 2, 'Шаурма Каран', None, None, '-', '-'),
+    ]
+    for data in test_data:
+        conn.execute('''
+            INSERT OR REPLACE INTO residents 
+            (floor, room, group_name, place, full_name, check_in, registration, phone, note)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', data)
     conn.commit()
-    return True
 
 # ==================== PYDANTIC МОДЕЛИ ====================
 PHONE_RE = re.compile(r'^\+?\d{10,15}$')
@@ -211,6 +213,10 @@ class SettingsUpdate(BaseModel):
 def index():
     return send_from_directory('templates', 'index.html')
 
+@app.route('/manifest.json')
+def manifest():
+    return send_from_directory('.', 'manifest.json')
+
 @app.route('/static/css/style.css')
 def serve_css():
     return send_from_directory('static/css', 'style.css')
@@ -218,10 +224,6 @@ def serve_css():
 @app.route('/static/js/app.js')
 def serve_js():
     return send_from_directory('static/js', 'app.js')
-
-@app.route('/manifest.json')
-def manifest():
-    return send_from_directory('.', 'manifest.json')
 
 @app.route('/static/icons/<path:filename>')
 def serve_icons(filename):
@@ -233,18 +235,13 @@ def serve_icons(filename):
 def get_residents():
     floor = request.args.get('floor', type=int)
     conn = get_db()
-    cur = conn.cursor()
-    
     query = 'SELECT * FROM residents WHERE 1=1'
     params = []
     if floor is not None:
-        query += ' AND floor = %s'
+        query += ' AND floor = ?'
         params.append(floor)
     query += ' ORDER BY CAST(room AS INTEGER), place'
-    
-    cur.execute(query, params)
-    residents = cur.fetchall()
-    cur.close()
+    residents = conn.execute(query, params).fetchall()
     conn.close()
     return jsonify([dict(r) for r in residents])
 
@@ -252,10 +249,7 @@ def get_residents():
 @require_auth
 def get_resident(resident_id):
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute('SELECT * FROM residents WHERE id = %s', (resident_id,))
-    resident = cur.fetchone()
-    cur.close()
+    resident = conn.execute('SELECT * FROM residents WHERE id = ?', (resident_id,)).fetchone()
     conn.close()
     if resident:
         return jsonify(dict(resident))
@@ -270,24 +264,19 @@ def update_resident(resident_id):
         return jsonify({'error': e.errors()}), 400
 
     conn = get_db()
-    cur = conn.cursor()
-    
     if data.full_name != '(свободно)':
-        cur.execute('SELECT id FROM residents WHERE full_name = %s AND id != %s', 
-                   (data.full_name, resident_id))
-        if cur.fetchone():
-            cur.close()
+        existing = conn.execute('SELECT id FROM residents WHERE full_name = ? AND id != ?', 
+                               (data.full_name, resident_id)).fetchone()
+        if existing:
             conn.close()
             return jsonify({'error': 'Жилец с таким ФИО уже существует'}), 400
 
-    cur.execute('''
+    conn.execute('''
         UPDATE residents 
-        SET group_name=%s, full_name=%s, check_in=%s, registration=%s, phone=%s, note=%s, updated_at=CURRENT_TIMESTAMP
-        WHERE id=%s
+        SET group_name=?, full_name=?, check_in=?, registration=?, phone=?, note=?, updated_at=CURRENT_TIMESTAMP
+        WHERE id=?
     ''', (data.group_name, data.full_name, data.check_in, data.registration, data.phone, data.note, resident_id))
-    
     conn.commit()
-    cur.close()
     conn.close()
     return jsonify({'status': 'success'})
 
@@ -300,36 +289,27 @@ def add_resident():
         return jsonify({'error': e.errors()}), 400
 
     conn = get_db()
-    cur = conn.cursor()
-    
-    cur.execute('SELECT * FROM residents WHERE room=%s AND place=%s', (data.room, data.place))
-    existing = cur.fetchone()
-    
+    existing = conn.execute('SELECT * FROM residents WHERE room=? AND place=?', (data.room, data.place)).fetchone()
     if not existing:
-        cur.close()
         conn.close()
         return jsonify({'error': 'Место не найдено'}), 404
     if existing['full_name'] != '(свободно)':
-        cur.close()
         conn.close()
         return jsonify({'error': 'Место занято'}), 400
 
     if data.full_name != '(свободно)':
-        cur.execute('SELECT id FROM residents WHERE full_name = %s', (data.full_name,))
-        if cur.fetchone():
-            cur.close()
+        dup = conn.execute('SELECT id FROM residents WHERE full_name = ?', (data.full_name,)).fetchone()
+        if dup:
             conn.close()
             return jsonify({'error': 'Жилец с таким ФИО уже заселён'}), 400
 
-    cur.execute('''
+    conn.execute('''
         UPDATE residents 
-        SET group_name=%s, full_name=%s, check_in=%s, registration=%s, phone=%s, note=%s, updated_at=CURRENT_TIMESTAMP
-        WHERE room=%s AND place=%s
+        SET group_name=?, full_name=?, check_in=?, registration=?, phone=?, note=?, updated_at=CURRENT_TIMESTAMP
+        WHERE room=? AND place=?
     ''', (data.group_name, data.full_name, data.check_in, data.registration, data.phone, data.note,
           data.room, data.place))
-    
     conn.commit()
-    cur.close()
     conn.close()
     return jsonify({'status': 'success'}), 201
 
@@ -342,38 +322,31 @@ def move_resident(resident_id):
         return jsonify({'error': e.errors()}), 400
 
     conn = get_db()
-    cur = conn.cursor()
-    
     if data.full_name != '(свободно)':
-        cur.execute('SELECT id FROM residents WHERE full_name = %s AND id != %s', 
-                   (data.full_name, resident_id))
-        if cur.fetchone():
-            cur.close()
+        dup = conn.execute('SELECT id FROM residents WHERE full_name = ? AND id != ?', 
+                          (data.full_name, resident_id)).fetchone()
+        if dup:
             conn.close()
             return jsonify({'error': 'Жилец с таким ФИО уже существует'}), 400
 
-    cur.execute('''
+    conn.execute('''
         UPDATE residents 
         SET group_name='-', full_name='(свободно)', check_in=NULL, registration=NULL, phone='-', note='-', updated_at=CURRENT_TIMESTAMP
-        WHERE id=%s
+        WHERE id=?
     ''', (resident_id,))
 
-    cur.execute('SELECT * FROM residents WHERE room=%s AND place=%s', (data.to_room, data.to_place))
-    target = cur.fetchone()
-    
+    target = conn.execute('SELECT * FROM residents WHERE room=? AND place=?', (data.to_room, data.to_place)).fetchone()
     if target and target['full_name'] == '(свободно)':
-        cur.execute('''
+        conn.execute('''
             UPDATE residents 
-            SET group_name=%s, full_name=%s, check_in=%s, registration=%s, phone=%s, note=%s, updated_at=CURRENT_TIMESTAMP
-            WHERE room=%s AND place=%s
+            SET group_name=?, full_name=?, check_in=?, registration=?, phone=?, note=?, updated_at=CURRENT_TIMESTAMP
+            WHERE room=? AND place=?
         ''', (data.group_name, data.full_name, data.check_in, data.registration, data.phone, data.note,
               data.to_room, data.to_place))
         conn.commit()
-        cur.close()
         conn.close()
         return jsonify({'status': 'success'})
     else:
-        cur.close()
         conn.close()
         return jsonify({'error': 'Целевое место занято или не существует'}), 400
 
@@ -381,14 +354,12 @@ def move_resident(resident_id):
 @require_auth
 def free_place(resident_id):
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute('''
+    conn.execute('''
         UPDATE residents 
         SET group_name='-', full_name='(свободно)', check_in=NULL, registration=NULL, phone='-', note='-', updated_at=CURRENT_TIMESTAMP
-        WHERE id=%s
+        WHERE id=?
     ''', (resident_id,))
     conn.commit()
-    cur.close()
     conn.close()
     return jsonify({'status': 'success'})
 
@@ -402,11 +373,9 @@ def update_settings():
         return jsonify({'error': e.errors()}), 400
 
     conn = get_db()
-    cur = conn.cursor()
     for k, v in data.model_dump().items():
-        cur.execute('INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value', (k, v))
+        conn.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (k, v))
     conn.commit()
-    cur.close()
     conn.close()
     return jsonify({'status': 'success'})
 
@@ -414,10 +383,7 @@ def update_settings():
 @require_auth
 def get_settings():
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute('SELECT key, value FROM settings')
-    settings = cur.fetchall()
-    cur.close()
+    settings = conn.execute('SELECT key, value FROM settings').fetchall()
     conn.close()
     return jsonify({s['key']: s['value'] for s in settings})
 
@@ -426,29 +392,19 @@ def get_settings():
 @require_auth
 def get_report():
     conn = get_db()
-    cur = conn.cursor()
-    
-    cur.execute('SELECT COUNT(*) as count FROM residents')
-    total = cur.fetchone()['count']
-    
-    cur.execute('SELECT COUNT(*) as count FROM residents WHERE full_name != %s', ('(свободно)',))
-    occupied = cur.fetchone()['count']
-    
+    total = conn.execute('SELECT COUNT(*) as count FROM residents').fetchone()['count']
+    occupied = conn.execute('SELECT COUNT(*) as count FROM residents WHERE full_name != "(свободно)"').fetchone()['count']
     free = total - occupied
     load_percent = round((occupied / total) * 100, 1) if total > 0 else 0
 
-    cur.execute('''
+    groups = conn.execute('''
         SELECT group_name, COUNT(*) as count 
-        FROM residents WHERE full_name != %s 
-        GROUP BY group_name ORDER BY count DESC
-    ''', ('(свободно)',))
-    groups = cur.fetchall()
+        FROM residents WHERE full_name != "(свободно)" GROUP BY group_name ORDER BY count DESC
+    ''').fetchall()
 
-    cur.execute('SELECT key, value FROM settings')
-    settings = cur.fetchall()
+    settings = conn.execute('SELECT key, value FROM settings').fetchall()
     settings_dict = {s['key']: s['value'] for s in settings}
 
-    cur.close()
     conn.close()
     return jsonify({
         'total': total, 'occupied': occupied, 'free': free, 'load_percent': load_percent,
@@ -461,10 +417,7 @@ def get_report():
 @require_auth
 def get_groups():
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute('SELECT DISTINCT group_name FROM residents WHERE group_name != %s ORDER BY group_name', ('-',))
-    groups = cur.fetchall()
-    cur.close()
+    groups = conn.execute('SELECT DISTINCT group_name FROM residents WHERE group_name != "-" ORDER BY group_name').fetchall()
     conn.close()
     return jsonify([g['group_name'] for g in groups])
 
@@ -473,16 +426,13 @@ def get_groups():
 def get_free_places():
     floor = request.args.get('floor', type=int)
     conn = get_db()
-    cur = conn.cursor()
-    query = 'SELECT room, place, floor FROM residents WHERE full_name = %s'
-    params = ['(свободно)']
+    query = 'SELECT room, place, floor FROM residents WHERE full_name = "(свободно)"'
+    params = []
     if floor is not None:
-        query += ' AND floor = %s'
+        query += ' AND floor = ?'
         params.append(floor)
     query += ' ORDER BY CAST(room AS INTEGER), place'
-    cur.execute(query, params)
-    places = cur.fetchall()
-    cur.close()
+    places = conn.execute(query, params).fetchall()
     conn.close()
     return jsonify([dict(p) for p in places])
 
@@ -490,10 +440,7 @@ def get_free_places():
 @require_auth
 def get_rooms():
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute('SELECT DISTINCT room FROM residents ORDER BY CAST(room AS INTEGER)')
-    rooms = cur.fetchall()
-    cur.close()
+    rooms = conn.execute('SELECT DISTINCT room FROM residents ORDER BY CAST(room AS INTEGER)').fetchall()
     conn.close()
     return jsonify([r['room'] for r in rooms])
 
@@ -501,10 +448,7 @@ def get_rooms():
 @require_auth
 def get_floors():
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute('SELECT DISTINCT floor FROM residents ORDER BY floor')
-    floors = cur.fetchall()
-    cur.close()
+    floors = conn.execute('SELECT DISTINCT floor FROM residents ORDER BY floor').fetchall()
     conn.close()
     return jsonify([f['floor'] for f in floors])
 
@@ -516,28 +460,20 @@ def export_html():
         return jsonify({"error": "Unauthorized"}), 401
     
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute('''
+    residents = conn.execute('''
         SELECT floor, room, group_name, place, full_name, 
-               COALESCE(check_in, '-') as check_in, 
-               COALESCE(registration, '-') as registration, 
+               IFNULL(check_in, '-') as check_in, 
+               IFNULL(registration, '-') as registration, 
                phone, note
         FROM residents 
         ORDER BY floor, CAST(room AS INTEGER), place
-    ''')
-    residents = cur.fetchall()
+    ''').fetchall()
     
-    cur.execute('SELECT COUNT(*) as count FROM residents')
-    total = cur.fetchone()['count']
+    total = conn.execute('SELECT COUNT(*) as count FROM residents').fetchone()['count']
+    occupied = conn.execute('SELECT COUNT(*) as count FROM residents WHERE full_name != "(свободно)"').fetchone()['count']
     
-    cur.execute('SELECT COUNT(*) as count FROM residents WHERE full_name != %s', ('(свободно)',))
-    occupied = cur.fetchone()['count']
-    
-    cur.execute('SELECT key, value FROM settings')
-    settings_rows = cur.fetchall()
+    settings_rows = conn.execute('SELECT key, value FROM settings').fetchall()
     settings = {row['key']: row['value'] for row in settings_rows}
-    
-    cur.close()
     conn.close()
 
     html_template = '''
@@ -629,17 +565,14 @@ def export_txt():
         return jsonify({"error": "Unauthorized"}), 401
     
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute('''
+    residents = conn.execute('''
         SELECT floor, room, group_name, place, full_name, 
-               COALESCE(check_in, '-') as check_in, 
-               COALESCE(registration, '-') as registration, 
+               IFNULL(check_in, '-') as check_in, 
+               IFNULL(registration, '-') as registration, 
                phone, note
         FROM residents 
         ORDER BY floor, CAST(room AS INTEGER), place
-    ''')
-    residents = cur.fetchall()
-    cur.close()
+    ''').fetchall()
     conn.close()
 
     lines = ["Этаж\tКомната\tГруппа\t№\tФИО\tДата заезда\tРегистрация\tТелефон\tПримечание"]
