@@ -305,7 +305,7 @@ def free_place(resident_id):
     }, params=params)
     return jsonify({'status': 'success'})
 
-# ==================== API: НАСТРОЙКИ (ОТЛАДОЧНАЯ ВЕРСИЯ) ====================
+# ==================== API: НАСТРОЙКИ (С ПОДРОБНЫМ ЛОГИРОВАНИЕМ) ====================
 @app.route('/api/settings', methods=['POST'])
 @require_auth
 def update_settings():
@@ -323,15 +323,24 @@ def update_settings():
         log(f"💾 Сохраняем {k} = {v}")
         
         try:
-            # Пробуем метод 1: UPSERT с on_conflict
+            # Используем POST с on_conflict для upsert
             params = {"on_conflict": "key"}
             response = supabase_request("POST", "settings", data={"key": k, "value": v}, params=params)
+            
+            # ПРИНУДИТЕЛЬНО ЛОГИРУЕМ ОТВЕТ
+            log(f"📡 Ответ от Supabase: статус {response.status_code}")
+            log(f"📄 Тело ответа: {response.text[:300]}")
+            
             results[k] = response.status_code
             
             if response.status_code not in [200, 201, 204]:
                 log_error(f"❌ Ошибка сохранения {k}: статус {response.status_code}")
-                log_error(f"   Ответ: {response.text[:200]}")
-                return jsonify({"error": f"Ошибка сохранения {k}", "status": response.status_code}), 500
+                log_error(f"   Ответ: {response.text[:500]}")
+                return jsonify({
+                    "error": f"Ошибка сохранения {k}", 
+                    "status": response.status_code,
+                    "detail": response.text[:200]
+                }), 500
             else:
                 log(f"✅ {k} сохранено успешно")
                 
