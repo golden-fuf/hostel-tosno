@@ -17,7 +17,7 @@ CORS(app, resources={r"/api/*": {"origins": os.getenv("CORS_ORIGINS", "*").split
 # ==================== ПОДКЛЮЧЕНИЕ К SUPABASE ====================
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+from supabase import create_client, Client(SUPABASE_URL, SUPABASE_KEY)
 
 # ==================== АУТЕНТИФИКАЦИЯ ====================
 AUTH_TOKEN = os.getenv("AUTH_TOKEN", "hostel-secret-2026")
