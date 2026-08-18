@@ -302,11 +302,11 @@ def free_place(resident_id):
     }, params=params)
     return jsonify({'status': 'success'})
 
-# ==================== API: НАСТРОЙКИ (СОХРАНЕНИЕ ПО ОТДЕЛЬНОСТИ) ====================
+# ==================== API: НАСТРОЙКИ (ИСПРАВЛЕННЫЙ) ====================
 @app.route('/api/settings', methods=['POST'])
 @require_auth
 def update_settings():
-    """Сохранение настроек по отдельности (каждая независимо)"""
+    """Сохранение настроек — перезаписываем все строки"""
     try:
         data = SettingsUpdate(**request.json)
         log(f"✅ Получены настройки: {data.model_dump()}")
@@ -314,7 +314,7 @@ def update_settings():
         log_error(f"❌ Ошибка валидации: {e.errors()}")
         return jsonify({'error': e.errors()}), 400
 
-    # Сохраняем каждую настройку отдельно
+    # Сохраняем каждую настройку с помощью UPSERT
     results = {}
     errors = []
     
@@ -322,11 +322,10 @@ def update_settings():
         log(f"💾 Сохраняем {k} = {v}")
         
         try:
-            # Используем POST с on_conflict для upsert
+            # Используем POST с on_conflict для UPSERT
             params = {"on_conflict": "key"}
             response = supabase_request("POST", "settings", data={"key": k, "value": v}, params=params)
             
-            # Логируем ответ
             log(f"📡 Ответ от Supabase для {k}: статус {response.status_code}")
             
             if response.status_code not in [200, 201, 204]:
@@ -345,7 +344,6 @@ def update_settings():
             errors.append({k: error_msg})
             results[k] = {"status": "error", "detail": str(e)}
     
-    # Возвращаем результат
     if errors:
         log(f"⚠️ Некоторые настройки не сохранились: {errors}")
         return jsonify({
@@ -353,7 +351,7 @@ def update_settings():
             'message': 'Некоторые настройки не сохранились',
             'results': results,
             'errors': errors
-        }), 207  # Multi-Status
+        }), 207
     
     log(f"✅ Все настройки сохранены: {results}")
     return jsonify({'status': 'success', 'results': results})
