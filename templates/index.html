@@ -33,6 +33,7 @@
                     Хостел <span class="subtitle">Тосно</span>
                 </h1>
                 <div class="header-actions">
+                    <!-- Отчёт для печати (доступен всем) -->
                     <button class="btn-icon" onclick="window.open('/api/export/html?token=' + localStorage.getItem('hostel_auth_token'), '_blank')" title="Отчёт для печати">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M6 9V2h12v7"></path>
@@ -41,6 +42,7 @@
                         </svg>
                     </button>
                     
+                    <!-- Скачать TXT (доступен всем) -->
                     <button class="btn-icon" onclick="window.location.href='/api/export/txt?token=' + localStorage.getItem('hostel_auth_token')" title="Скачать TXT (бэкап)">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -49,6 +51,7 @@
                         </svg>
                     </button>
                     
+                    <!-- Статистика (доступна всем) -->
                     <button class="btn-icon" onclick="showReport()" title="Статистика">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 12v-2a5 5 0 0 0-5-5H8a5 5 0 0 0-5 5v2"></path>
@@ -59,6 +62,7 @@
                         </svg>
                     </button>
                     
+                    <!-- Кнопки только для администратора (скрываются через JS) -->
                     <button class="btn-icon btn-edit-allowed" onclick="showAddForm()" title="Заселить">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -73,7 +77,8 @@
                         </svg>
                     </button>
                     
-                    <button class="btn-icon btn-edit-allowed" onclick="logout()" title="Выйти">
+                    <!-- Кнопка выхода (видна ВСЕМ, включая гостей) -->
+                    <button class="btn-icon" onclick="logout()" title="Выйти">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                             <polyline points="16 17 21 12 16 7"></polyline>
