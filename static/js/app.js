@@ -5,6 +5,7 @@ let currentFilter = 'all';
 let currentFloor = 'all';
 let searchQuery = '';
 let authToken = localStorage.getItem('hostel_auth_token') || '';
+let isGuest = false;
 let hasUnsavedChanges = false;
 
 // ==================== XSS ЗАЩИТА ====================
@@ -20,13 +21,40 @@ function checkAuth() {
     if (!authToken) {
         document.getElementById('authOverlay').style.display = 'flex';
         document.getElementById('app').style.display = 'none';
-    } else {
-        document.getElementById('authOverlay').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
-        loadData();
-        loadFloors();
-        updateStats();
+        return;
     }
+
+    // Определяем, гость ли это (по токену)
+    isGuest = authToken.startsWith('guest') || authToken === 'guest-view-2026';
+
+    document.getElementById('authOverlay').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+
+    // Показываем гостевую метку
+    const guestBadge = document.getElementById('guestBadge');
+    if (isGuest) {
+        if (!guestBadge) {
+            const badge = document.createElement('div');
+            badge.id = 'guestBadge';
+            badge.style.cssText = `
+                background: #ffaa00; color: #121212; 
+                padding: 4px 12px; border-radius: 20px;
+                font-size: 12px; font-weight: 600;
+                margin-left: 10px; display: inline-block;
+            `;
+            badge.textContent = '👀 Гостевой (только просмотр)';
+            document.querySelector('.app-title').appendChild(badge);
+        }
+    } else {
+        if (guestBadge) guestBadge.remove();
+    }
+
+    // Скрыть/показать кнопки редактирования
+    toggleEditButtons();
+
+    loadData();
+    loadFloors();
+    updateStats();
 }
 
 function doAuth() {
@@ -46,6 +74,13 @@ function logout() {
     checkAuth();
 }
 
+function toggleEditButtons() {
+    // Скрываем кнопки редактирования в шапке
+    document.querySelectorAll('.btn-edit-allowed').forEach(el => {
+        el.style.display = isGuest ? 'none' : 'flex';
+    });
+}
+
 // ==================== API ХЕЛПЕР ====================
 async function apiFetch(url, options = {}) {
     options.headers = options.headers || {};
@@ -57,6 +92,10 @@ async function apiFetch(url, options = {}) {
     if (resp.status === 401) {
         logout();
         throw new Error('Unauthorized');
+    }
+    if (resp.status === 403) {
+        showToast('error', 'Гостевой режим: действие запрещено');
+        throw new Error('Forbidden');
     }
     return resp;
 }
@@ -281,7 +320,7 @@ function renderRooms() {
             const regDisplay = formatDateDisplay(r.registration);
             
             html += `
-                <div class="resident-item" onclick="${isFreePlace ? `showAddFormToRoom('${escapeHtml(r.room)}', ${r.place})` : `editResident(${r.id})`}">
+                <div class="resident-item" onclick="${isFreePlace && !isGuest ? `showAddFormToRoom('${escapeHtml(r.room)}', ${r.place})` : (!isFreePlace && !isGuest ? `editResident(${r.id})` : '')}">
                     <span class="resident-place">${r.place}</span>
                     <div class="resident-info">
                         <div class="resident-name ${isFreePlace ? 'free' : ''}">
@@ -327,7 +366,7 @@ function renderRooms() {
                             </div>
                         ` : ''}
                     </div>
-                    ${!isFreePlace ? `
+                    ${!isFreePlace && !isGuest ? `
                         <div class="resident-actions">
                             <button class="btn-action" onclick="event.stopPropagation(); editResident(${r.id})" title="Редактировать">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4a9eff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -354,6 +393,10 @@ function renderRooms() {
 
 // ==================== РЕДАКТИРОВАНИЕ ====================
 async function editResident(id) {
+    if (isGuest) {
+        showToast('error', 'Гостевой режим: редактирование запрещено');
+        return;
+    }
     try {
         const response = await apiFetch(`/api/residents/${id}`);
         if (!response.ok) throw new Error('Ошибка загрузки жильца');
@@ -457,6 +500,10 @@ async function saveEdit(event, id) {
 
 // ==================== ПЕРЕСЕЛЕНИЕ ====================
 async function showMoveForm(id) {
+    if (isGuest) {
+        showToast('error', 'Гостевой режим: переселение запрещено');
+        return;
+    }
     const resp = await apiFetch(`/api/residents/${id}`);
     const resident = await resp.json();
     const url = currentFloor !== 'all' ? `/api/free_places?floor=${currentFloor}` : '/api/free_places';
@@ -561,10 +608,18 @@ async function saveMove(event, fromId) {
 
 // ==================== ЗАСЕЛЕНИЕ ====================
 function showAddForm() {
+    if (isGuest) {
+        showToast('error', 'Гостевой режим: заселение запрещено');
+        return;
+    }
     showAddFormToRoom(null, null);
 }
 
 async function showAddFormToRoom(room, place) {
+    if (isGuest) {
+        showToast('error', 'Гостевой режим: заселение запрещено');
+        return;
+    }
     try {
         const url = currentFloor !== 'all' ? `/api/free_places?floor=${currentFloor}` : '/api/free_places';
         const freePlacesResponse = await apiFetch(url);
@@ -684,6 +739,10 @@ async function saveAdd(event) {
 
 // ==================== ОСВОБОЖДЕНИЕ ====================
 async function freePlace(id, name) {
+    if (isGuest) {
+        showToast('error', 'Гостевой режим: освобождение запрещено');
+        return;
+    }
     if (!confirm(`Освободить место "${name}"?`)) return;
     try {
         const response = await apiFetch(`/api/residents/${id}`, { method: 'DELETE' });
@@ -784,6 +843,10 @@ async function showReport() {
 
 // ==================== НАСТРОЙКИ ====================
 async function showSettings() {
+    if (isGuest) {
+        showToast('error', 'Гостевой режим: настройки запрещены');
+        return;
+    }
     try {
         const response = await apiFetch('/api/settings');
         if (!response.ok) throw new Error('Ошибка настроек');
