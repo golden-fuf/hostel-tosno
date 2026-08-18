@@ -75,7 +75,7 @@ function logout() {
 }
 
 function toggleEditButtons() {
-    // Скрываем экспорт (печать и TXT)
+    // Скрываем экспорт (только TXT остался)
     document.querySelectorAll('.btn-export-allowed').forEach(el => {
         el.style.display = isGuest ? 'none' : 'flex';
     });
@@ -279,9 +279,13 @@ function renderRooms() {
         const occupied = residents.filter(r => r.full_name !== '(свободно)').length;
         const free = totalPlaces - occupied;
         const isFree = occupied === 0;
+        
+        // Если комната полностью свободна, клик по заголовку открывает заселение
+        const roomClick = !isGuest && isFree ? `onclick="showAddFormToRoom('${room}', null)"` : '';
+        
         html += `
             <div class="room-card ${isFree ? 'free-room' : ''}">
-                <div class="room-header">
+                <div class="room-header" ${roomClick}>
                     <span class="room-name">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
                             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -325,7 +329,16 @@ function renderRooms() {
             const regDisplay = formatDateDisplay(r.registration);
             
             // В гостевом режиме клик по жильцу ничего не делает
-            const clickHandler = !isGuest && !isFreePlace ? `onclick="editResident(${r.id})"` : '';
+            let clickHandler = '';
+            if (!isGuest) {
+                if (isFreePlace) {
+                    // Свободное место — открываем заселение
+                    clickHandler = `onclick="showAddFormToRoom('${r.room}', ${r.place})"`;
+                } else {
+                    // Занятое место — открываем редактирование
+                    clickHandler = `onclick="editResident(${r.id})"`;
+                }
+            }
             
             html += `
                 <div class="resident-item" ${clickHandler}>
