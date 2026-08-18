@@ -18,13 +18,6 @@ CORS(app, resources={r"/api/*": {"origins": os.getenv("CORS_ORIGINS", "*").split
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# ==================== ЛОГИРОВАНИЕ ====================
-def log(msg):
-    print(f"[LOG] {msg}")
-
-def log_error(msg):
-    print(f"[ERROR] {msg}")
-
 # ==================== ЗАПРОСЫ К SUPABASE ====================
 def supabase_request(method, endpoint, data=None, params=None):
     url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
@@ -35,26 +28,12 @@ def supabase_request(method, endpoint, data=None, params=None):
         "Prefer": "return=representation"
     }
     
-    log(f"🔹 {method} {endpoint}")
-    if data:
-        log(f"   Data: {data}")
-    if params:
-        log(f"   Params: {params}")
+    if method.upper() == "GET":
+        response = requests.get(url, headers=headers, params=params)
+    else:
+        response = requests.request(method, url, headers=headers, json=data, params=params)
     
-    try:
-        if method.upper() == "GET":
-            response = requests.get(url, headers=headers, params=params)
-        else:
-            response = requests.request(method, url, headers=headers, json=data, params=params)
-        
-        log(f"   Status: {response.status_code}")
-        if response.status_code >= 400:
-            log_error(f"   Error: {response.text[:500]}")
-        
-        return response
-    except Exception as e:
-        log_error(f"   Exception: {str(e)}")
-        raise
+    return response
 
 # ==================== АУТЕНТИФИКАЦИЯ ====================
 AUTH_TOKEN = os.getenv("AUTH_TOKEN", "hostel-secret-2026")
@@ -302,74 +281,35 @@ def free_place(resident_id):
     }, params=params)
     return jsonify({'status': 'success'})
 
-# ==================== API: НАСТРОЙКИ (ИСПРАВЛЕННЫЙ) ====================
+# ==================== API: НАСТРОЙКИ (ПРОСТОЙ СПОСОБ) ====================
 @app.route('/api/settings', methods=['POST'])
 @require_auth
 def update_settings():
-    """Сохранение настроек — перезаписываем все строки"""
     try:
         data = SettingsUpdate(**request.json)
-        log(f"✅ Получены настройки: {data.model_dump()}")
+        print(f"Получены настройки: {data.model_dump()}")
     except ValidationError as e:
-        log_error(f"❌ Ошибка валидации: {e.errors()}")
         return jsonify({'error': e.errors()}), 400
 
-    # Сохраняем каждую настройку с помощью UPSERT
-    results = {}
-    errors = []
-    
+    # Сохраняем каждую настройку методом "удалить + вставить"
     for k, v in data.model_dump().items():
-        log(f"💾 Сохраняем {k} = {v}")
+        print(f"Сохраняем {k} = {v}")
         
-        try:
-            # Используем POST с on_conflict для UPSERT
-            params = {"on_conflict": "key"}
-            response = supabase_request("POST", "settings", data={"key": k, "value": v}, params=params)
-            
-            log(f"📡 Ответ от Supabase для {k}: статус {response.status_code}")
-            
-            if response.status_code not in [200, 201, 204]:
-                error_msg = f"Ошибка сохранения {k}: статус {response.status_code}"
-                log_error(f"❌ {error_msg}")
-                log_error(f"   Ответ: {response.text[:200]}")
-                errors.append({k: error_msg})
-                results[k] = {"status": "error", "code": response.status_code}
-            else:
-                log(f"✅ {k} сохранено успешно")
-                results[k] = {"status": "success"}
-                
-        except Exception as e:
-            error_msg = f"Исключение при сохранении {k}: {str(e)}"
-            log_error(f"❌ {error_msg}")
-            errors.append({k: error_msg})
-            results[k] = {"status": "error", "detail": str(e)}
+        # 1. Удаляем существующую запись
+        delete_params = {"key": f"eq.{k}"}
+        supabase_request("DELETE", "settings", params=delete_params)
+        
+        # 2. Вставляем новую
+        supabase_request("POST", "settings", data={"key": k, "value": v})
     
-    if errors:
-        log(f"⚠️ Некоторые настройки не сохранились: {errors}")
-        return jsonify({
-            'status': 'partial',
-            'message': 'Некоторые настройки не сохранились',
-            'results': results,
-            'errors': errors
-        }), 207
-    
-    log(f"✅ Все настройки сохранены: {results}")
-    return jsonify({'status': 'success', 'results': results})
+    return jsonify({'status': 'success'})
 
 @app.route('/api/settings', methods=['GET'])
 @require_auth
 def get_settings():
-    """Загрузка настроек"""
-    log("🔹 GET settings")
     params = {"select": "key,value"}
     response = supabase_request("GET", "settings", params=params)
-    
-    if response.status_code != 200:
-        log_error(f"❌ Ошибка загрузки настроек: {response.status_code}")
-        return jsonify({"error": "Ошибка загрузки настроек"}), 500
-    
     settings = {item['key']: item['value'] for item in response.json()}
-    log(f"✅ Загружены настройки: {settings}")
     return jsonify(settings)
 
 # ==================== API: ОТЧЁТЫ ====================
@@ -406,7 +346,6 @@ def get_report():
         'date': datetime.now().strftime('%Y-%m-%d')
     })
 
-# ==================== API: ВСПОМОГАТЕЛЬНЫЕ ====================
 @app.route('/api/groups', methods=['GET'])
 @require_auth
 def get_groups():
@@ -563,6 +502,5 @@ def export_txt():
     )
     return response
 
-# ==================== ЗАПУСК ====================
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
