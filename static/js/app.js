@@ -75,7 +75,7 @@ function logout() {
 }
 
 function toggleEditButtons() {
-    // Скрываем кнопки редактирования в шапке
+    // Скрываем кнопки редактирования в шапке (кроме кнопки выхода — у неё нет класса btn-edit-allowed)
     document.querySelectorAll('.btn-edit-allowed').forEach(el => {
         el.style.display = isGuest ? 'none' : 'flex';
     });
@@ -319,8 +319,11 @@ function renderRooms() {
             const checkInDisplay = formatDateDisplay(r.check_in);
             const regDisplay = formatDateDisplay(r.registration);
             
+            // В гостевом режиме клик по жильцу ничего не делает
+            const clickHandler = !isGuest && !isFreePlace ? `onclick="editResident(${r.id})"` : '';
+            
             html += `
-                <div class="resident-item" onclick="${isFreePlace && !isGuest ? `showAddFormToRoom('${escapeHtml(r.room)}', ${r.place})` : (!isFreePlace && !isGuest ? `editResident(${r.id})` : '')}">
+                <div class="resident-item" ${clickHandler}>
                     <span class="resident-place">${r.place}</span>
                     <div class="resident-info">
                         <div class="resident-name ${isFreePlace ? 'free' : ''}">
