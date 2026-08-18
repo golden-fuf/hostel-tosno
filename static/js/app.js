@@ -49,7 +49,7 @@ function checkAuth() {
         if (guestBadge) guestBadge.remove();
     }
 
-    // Скрыть/показать кнопки редактирования
+    // Скрыть/показать кнопки
     toggleEditButtons();
 
     loadData();
@@ -75,7 +75,12 @@ function logout() {
 }
 
 function toggleEditButtons() {
-    // Скрываем кнопки редактирования в шапке (кроме кнопки выхода — у неё нет класса btn-edit-allowed)
+    // Скрываем экспорт (печать и TXT)
+    document.querySelectorAll('.btn-export-allowed').forEach(el => {
+        el.style.display = isGuest ? 'none' : 'flex';
+    });
+
+    // Скрываем кнопки редактирования (заселить, настройки)
     document.querySelectorAll('.btn-edit-allowed').forEach(el => {
         el.style.display = isGuest ? 'none' : 'flex';
     });
