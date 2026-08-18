@@ -33,8 +33,8 @@
                     Хостел <span class="subtitle">Тосно</span>
                 </h1>
                 <div class="header-actions">
-                    <!-- Отчёт для печати (доступен всем) -->
-                    <button class="btn-icon" onclick="window.open('/api/export/html?token=' + localStorage.getItem('hostel_auth_token'), '_blank')" title="Отчёт для печати">
+                    <!-- Отчёт для печати (скрывается у гостя) -->
+                    <button class="btn-icon btn-export-allowed" onclick="window.open('/api/export/html?token=' + localStorage.getItem('hostel_auth_token'), '_blank')" title="Отчёт для печати">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M6 9V2h12v7"></path>
                             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
@@ -42,8 +42,8 @@
                         </svg>
                     </button>
                     
-                    <!-- Скачать TXT (доступен всем) -->
-                    <button class="btn-icon" onclick="window.location.href='/api/export/txt?token=' + localStorage.getItem('hostel_auth_token')" title="Скачать TXT (бэкап)">
+                    <!-- Скачать TXT (скрывается у гостя) -->
+                    <button class="btn-icon btn-export-allowed" onclick="window.location.href='/api/export/txt?token=' + localStorage.getItem('hostel_auth_token')" title="Скачать TXT (бэкап)">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="7 10 12 15 17 10"></polyline>
