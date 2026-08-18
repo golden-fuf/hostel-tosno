@@ -8,8 +8,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Хостел Тосно</title>
     <link rel="manifest" href="/manifest.json">
-    <!-- ДОБАВЛЕННЫЙ ТЕГ ФАВИКОНА -->
-    <link rel="icon" href="/static/icons/icon-192.png" type="image/png" sizes="192x192">
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -35,16 +33,7 @@
                     Хостел <span class="subtitle">Тосно</span>
                 </h1>
                 <div class="header-actions">
-                    <!-- НОВАЯ КНОПКА 1: Экспорт HTML (печать/PDF) -->
-                    <button class="btn-icon" onclick="window.open('/api/export/html?token=' + localStorage.getItem('hostel_auth_token'), '_blank')" title="Отчёт для печати">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M6 9V2h12v7"></path>
-                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                            <rect x="6" y="14" width="12" height="8"></rect>
-                        </svg>
-                    </button>
-                    
-                    <!-- НОВАЯ КНОПКА 2: Экспорт TXT (бэкап) -->
+                    <!-- КНОПКА: Экспорт TXT (бэкап) -->
                     <button class="btn-icon" onclick="window.location.href='/api/export/txt?token=' + localStorage.getItem('hostel_auth_token')" title="Скачать TXT (бэкап)">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -53,7 +42,7 @@
                         </svg>
                     </button>
                     
-                    <!-- Старая кнопка Отчёт (статистика в модалке) -->
+                    <!-- КНОПКА: Статистика (отчёт в модалке) -->
                     <button class="btn-icon" onclick="showReport()" title="Статистика">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 12v-2a5 5 0 0 0-5-5H8a5 5 0 0 0-5 5v2"></path>
@@ -64,7 +53,7 @@
                         </svg>
                     </button>
                     
-                    <!-- Старая кнопка Заселить -->
+                    <!-- КНОПКА: Заселить -->
                     <button class="btn-icon" onclick="showAddForm()" title="Заселить">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -72,7 +61,7 @@
                         </svg>
                     </button>
                     
-                    <!-- Старая кнопка Настройки -->
+                    <!-- КНОПКА: Настройки -->
                     <button class="btn-icon" onclick="showSettings()" title="Настройки">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="3"></circle>
@@ -80,7 +69,7 @@
                         </svg>
                     </button>
                     
-                    <!-- Старая кнопка Выход (поставил в конец, как было) -->
+                    <!-- КНОПКА: Выход -->
                     <button class="btn-icon" onclick="logout()" title="Выйти">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
