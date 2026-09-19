@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Хостел Тосно</title>
     
-    <!-- ФАВИКОН (добавлено) -->
+    <!-- ФАВИКОН -->
     <link rel="icon" type="image/png" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
     
@@ -47,29 +47,44 @@
                         </svg>
                     </button>
                     
-                    <!-- Статистика (доступна всем) -->
-                    <button class="btn-icon" onclick="showReport()" title="Статистика">
+                    <!-- Отчёт (бывшая Статистика) -->
+                    <button class="btn-icon" onclick="showReport()" title="Отчёт">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 12v-2a5 5 0 0 0-5-5H8a5 5 0 0 0-5 5v2"></path>
-                            <circle cx="12" cy="16" r="5"></circle>
-                            <line x1="12" y1="11" x2="12" y2="16"></line>
-                            <line x1="9" y1="13" x2="12" y2="16"></line>
-                            <line x1="15" y1="13" x2="12" y2="16"></line>
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                            <rect x="8" y="13" width="2" height="6"></rect>
+                            <rect x="12" y="11" width="2" height="8"></rect>
+                            <rect x="16" y="9" width="2" height="10"></rect>
                         </svg>
                     </button>
                     
-                    <!-- Кнопки только для администратора (скрываются через JS) -->
+                    <!-- Заселить (иконка с чемоданом) -->
                     <button class="btn-icon btn-edit-allowed" onclick="showAddForm()" title="Заселить">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <circle cx="12" cy="5" r="2"></circle>
+                            <path d="M12 7v4"></path>
+                            <path d="M10 11h4"></path>
+                            <path d="M10 11l-1 6h6l-1-6"></path>
+                            <rect x="2" y="12" width="6" height="8" rx="1"></rect>
+                            <path d="M4 12v-2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"></path>
+                            <line x1="2" y1="16" x2="8" y2="16"></line>
+                            <rect x="18" y="14" width="4" height="5" rx="1"></rect>
+                            <path d="M19 14v-1a1 1 0 0 1 1-1h0a1 1 0 0 1 1 1v1"></path>
                         </svg>
                     </button>
                     
-                    <button class="btn-icon btn-edit-allowed" onclick="showSettings()" title="Настройки">
+                    <!-- Редактирование (бывшие Настройки) -->
+                    <button class="btn-icon btn-edit-allowed" onclick="showSettings()" title="Редактирование">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="3"></circle>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            <path d="M4 12a8 8 0 0 1 8-8"></path>
+                            <polyline points="4 4 4 12 12 12"></polyline>
+                            <path d="M20 12a8 8 0 0 1-8 8"></path>
+                            <polyline points="20 20 20 12 12 12"></polyline>
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                         </svg>
                     </button>
                     
