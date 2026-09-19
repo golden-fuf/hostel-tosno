@@ -38,57 +38,49 @@
                 </h1>
                 <div class="header-actions">
                     
-                    <!-- Скачать TXT (скрывается у гостя) -->
+                    <!-- Скачать TXT (скрывается у гостя) - Иконка дискеты -->
                     <button class="btn-icon btn-export-allowed" onclick="window.location.href='/api/export/txt?token=' + localStorage.getItem('hostel_auth_token')" title="Скачать TXT (бэкап)">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="7 10 12 15 17 10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                            <polyline points="7 3 7 8 15 8"></polyline>
                         </svg>
                     </button>
                     
-                    <!-- Отчёт (бывшая Статистика) -->
+                    <!-- Отчёт - Иконка документа со списком -->
                     <button class="btn-icon" onclick="showReport()" title="Отчёт">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                            <line x1="16" y1="13" x2="8" y2="13"></line>
-                            <line x1="16" y1="17" x2="8" y2="17"></line>
-                            <polyline points="10 9 9 9 8 9"></polyline>
-                            <rect x="8" y="13" width="2" height="6"></rect>
-                            <rect x="12" y="11" width="2" height="8"></rect>
-                            <rect x="16" y="9" width="2" height="10"></rect>
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="9" x2="15" y2="9"></line>
+                            <line x1="9" y1="13" x2="15" y2="13"></line>
+                            <line x1="9" y1="17" x2="15" y2="17"></line>
+                            <line x1="3" y1="9" x2="21" y2="9"></line>
                         </svg>
                     </button>
                     
-                    <!-- Заселить (иконка с чемоданом) -->
+                    <!-- Заселить - Иконка человека в дверях -->
                     <button class="btn-icon btn-edit-allowed" onclick="showAddForm()" title="Заселить">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="5" r="2"></circle>
-                            <path d="M12 7v4"></path>
-                            <path d="M10 11h4"></path>
-                            <path d="M10 11l-1 6h6l-1-6"></path>
-                            <rect x="2" y="12" width="6" height="8" rx="1"></rect>
-                            <path d="M4 12v-2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"></path>
-                            <line x1="2" y1="16" x2="8" y2="16"></line>
-                            <rect x="18" y="14" width="4" height="5" rx="1"></rect>
-                            <path d="M19 14v-1a1 1 0 0 1 1-1h0a1 1 0 0 1 1 1v1"></path>
+                            <path d="M13 4h3a2 2 0 0 1 2 2v14"></path>
+                            <path d="M2 20h3"></path>
+                            <path d="M13 20h9"></path>
+                            <path d="M10 12v.01"></path>
+                            <path d="M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.562Z"></path>
+                            <circle cx="17" cy="9" r="2"></circle>
+                            <path d="M17 11v3"></path>
+                            <path d="M17 14l-2 4"></path>
+                            <path d="M17 14l2 4"></path>
                         </svg>
                     </button>
                     
-                    <!-- Редактирование (бывшие Настройки) -->
+                    <!-- Редактирование - Иконка карандаша -->
                     <button class="btn-icon btn-edit-allowed" onclick="showSettings()" title="Редактирование">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 12a8 8 0 0 1 8-8"></path>
-                            <polyline points="4 4 4 12 12 12"></polyline>
-                            <path d="M20 12a8 8 0 0 1-8 8"></path>
-                            <polyline points="20 20 20 12 12 12"></polyline>
-                            <path d="M12 20h9"></path>
-                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
                         </svg>
                     </button>
                     
-                    <!-- Кнопка выхода (видна ВСЕМ, включая гостей) -->
+                    <!-- Кнопка выхода - Иконка выхода из рамки -->
                     <button class="btn-icon" onclick="logout()" title="Выйти">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
