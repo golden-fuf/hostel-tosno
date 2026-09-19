@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hostel-app-v4';
+const CACHE_NAME = 'hostel-app-v5';
 const API_CACHE = 'api-cache-v2';
 
 const ASSETS = [
